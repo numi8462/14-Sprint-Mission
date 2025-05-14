@@ -2,7 +2,7 @@
 import withAuth from '../../components/auth/withAuth';
 import Navbar from '@/components/common/Navbar';
 import ButtonSmall from '@/components/common/ButtonSmall';
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useState } from 'react';
 import Input from '@/components/common/Input';
 import Textarea from '@/components/common/TextArea';
 import FileInput from '@/components/common/FileInput';
@@ -22,7 +22,6 @@ function AddBoard() {
     content: '',
     imgFile: null,
   });
-  const [isValidate, setIsValidate] = useState<boolean>(false);
 
   const handleInputChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -62,14 +61,9 @@ function AddBoard() {
     }
   };
 
-  useEffect(() => {
-    setIsValidate(false);
-    const title = formData.title.trim();
-    const content = formData.content.trim();
-    if (title.length > 0 && content.length > 0) {
-      setIsValidate(true);
-    }
-  }, [formData]);
+  const title = formData.title.trim();
+  const content = formData.content.trim();
+  const isValidate = title.length > 0 && content.length > 0;
 
   return (
     <>
@@ -98,7 +92,10 @@ function AddBoard() {
               height="h-[282px]"
               onChange={handleInputChange}
             />
-            <FileInput value={formData.imgFile} onChange={handleFileChange} />
+            <FileInput
+              value={formData.imgFile || null}
+              onChange={handleFileChange}
+            />
           </div>
         </form>
       </div>
