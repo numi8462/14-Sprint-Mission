@@ -6,7 +6,7 @@ import { ChangeEvent, FormEvent, useState } from 'react';
 import Input from '@/components/common/Input';
 import Textarea from '@/components/common/TextArea';
 import FileInput from '@/components/common/FileInput';
-import { postArticle } from '@/api/boards';
+import { postArticle } from '@/lib/boards';
 import { useRouter } from 'next/navigation';
 
 export interface FormDataProps {

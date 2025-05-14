@@ -1,73 +1,38 @@
-'use client';
-import { ComponentType, useEffect, useState } from 'react';
-import Cookies from 'js-cookie';
+import { ComponentType, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { login, User } from '@/api/auth';
+import { useAuthentication } from '@/hooks/useAuthentication';
 
-// 로그인 상태 확인 함수
-export const isAuthenticated = () => {
-  // 브라우저 환경인지 확인 (SSR 시 에러 방지)
-  if (typeof window !== 'undefined') {
-    const token = Cookies.get('accessToken');
-    return !!token; // 토큰이 존재하면 true, 없으면 false
-  }
-  return false;
-};
-
-// HOC에서 사용할 Props 타입
-function withAuth(WrappedComponent: ComponentType) {
-  const AuthenticatedComponent = () => {
+// HOC 구현
+function withAuth<P extends object>(WrappedComponent: ComponentType<P>) {
+  const AuthenticatedComponent = (props: P) => {
     const router = useRouter();
-    const [authState, setAuthState] = useState<{
-      isAuthenticated: boolean;
-      isLoading: boolean;
-      user: User | null;
-    }>({
-      isAuthenticated: false,
-      isLoading: true,
-      user: null,
-    });
+    const { isAuthenticated, isLoading, user } = useAuthentication();
 
     useEffect(() => {
-      const checkAuth = async () => {
-        const authenticated = isAuthenticated();
-        const userCookie = Cookies.get('user');
+      // 로딩이 완료되고 인증되지 않은 경우 리다이렉트
+      if (!isLoading && !isAuthenticated) {
+        router.push('/boards');
+      }
+    }, [isLoading, isAuthenticated, router]);
 
-        if (!authenticated) {
-          // 스프린트 10 에서는 로그인 페이지를 추가하지 않아서 바로 로그인
-          const result = await login('yhk8462@naver.com', 'password123');
-          console.log(result);
-        }
-
-        if (authenticated && userCookie) {
-          const currUser = JSON.parse(userCookie);
-          setAuthState({
-            isAuthenticated: true,
-            isLoading: false,
-            user: currUser,
-          });
-        } else {
-          setAuthState({
-            isAuthenticated: false,
-            isLoading: false,
-            user: null,
-          });
-        }
-      };
-      checkAuth();
-    }, [router]);
-
-    if (authState.isLoading) {
+    // 로딩 중인 경우
+    if (isLoading) {
       return <div>로딩중...</div>;
     }
 
-    return <WrappedComponent />;
+    // 인증된 경우에만 컴포넌트 렌더링
+    if (isAuthenticated) {
+      return <WrappedComponent {...props} user={user} />;
+    }
+
+    // 인증되지 않은 경우 (리다이렉트 전에 잠시 표시될 수 있음)
+    return null;
   };
 
   // displayName 설정 (디버깅 용이)
-  AuthenticatedComponent.displayName = `withAuth(${
-    WrappedComponent.displayName || WrappedComponent.name || 'Component'
-  })`;
+  const displayName =
+    WrappedComponent.displayName || WrappedComponent.name || 'Component';
+  AuthenticatedComponent.displayName = `withAuth(${displayName})`;
 
   return AuthenticatedComponent;
 }

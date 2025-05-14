@@ -1,5 +1,4 @@
-import { getNewAccessToken } from '@/api/auth';
-import Cookies from 'js-cookie';
+import { refreshToken } from '@/lib/auth';
 
 type RequestOptions = {
   method: string;
@@ -7,49 +6,58 @@ type RequestOptions = {
   body?: BodyInit | null;
 };
 
+function getCookie(name: string) {
+  const nameEQ = name + '=';
+  const ca = document.cookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+}
+
 export const fetchWithAuth = async (
   urlString: string,
   options: RequestOptions
 ): Promise<Response> => {
-  // 토큰이 없으면 헤더에서 Authorization 제거
-  const token = Cookies.get('accessToken');
-  const headers = { ...options.headers };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  } else if (headers.Authorization) {
-    // 토큰이 없는데 Authorization 헤더가 있으면 제거
-    delete headers.Authorization;
-  }
-
-  // 요청 실행
-  let response = await fetch(`${urlString}`, {
-    ...options,
-    headers,
-  });
-
-  // 401 응답 경우 토큰 갱신
-  if (response.status == 401) {
-    const refreshToken = Cookies.get('refreshToken');
-    if (!refreshToken) {
-      throw new Error('인증 만료');
-    }
-    // 새 토큰 가져오고 쿠키에 저장
-    const newToken = await getNewAccessToken(refreshToken);
-    console.log('token', newToken);
-    if (newToken) {
-      Cookies.set('accessToken', newToken, { expires: 1 }); // 1일간 유효
+  try {
+    const accessToken = getCookie('access_token');
+    const headers = { ...options.headers };
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    } else if (headers.Authorization) {
+      // 토큰이 없는데 Authorization 헤더가 있으면 제거
+      delete headers.Authorization;
     }
 
-    // 새로운 쿠키로 헤더 업데이트
-    headers.Authorization = `Bearer ${newToken}`;
-
-    // 재용청
-    response = await fetch(`${urlString}`, {
+    // 첫 번째 요청 시도
+    let response = await fetch(urlString, {
       ...options,
-      headers,
+      headers, // 쿠키 포함
     });
-  }
 
-  return response;
+    // 401 Unauthorized 응답을 받은 경우 토큰 갱신 시도
+    if (response.status === 401) {
+      console.log('재시도 401');
+      const refreshed = await refreshToken();
+
+      // 토큰 갱신에 성공한 경우 요청 재시도
+      if (refreshed) {
+        const accessToken = getCookie('access_token');
+        const headers = { ...options.headers };
+        headers.Authorization = `Bearer ${accessToken}`;
+
+        response = await fetch(urlString, {
+          ...options,
+          headers,
+        });
+      }
+    }
+
+    return response;
+  } catch (error) {
+    console.error('Fetch 요청 중 오류 발생:', error);
+    throw new Error(`API 요청 실패`);
+  }
 };

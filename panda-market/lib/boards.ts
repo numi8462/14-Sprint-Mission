@@ -10,15 +10,22 @@ interface UploadResponse {
 export const postArticle = async (formData: FormDataProps) => {
   console.log('formdata', formData);
   let image = null;
-  if (formData.imgFile) {
-    image = await uploadImage(formData.imgFile);
-  }
-  const { title, content } = formData;
+
   try {
+    if (formData.imgFile) {
+      image = await uploadImage(formData.imgFile);
+    } else {
+      image =
+        'https://sprint-fe-project.s3.ap-northeast-2.amazonaws.com/Sprint_Mission/user/1211/1747226492991/panda.png';
+    }
+
+    const { title, content } = formData;
+
     const response = await fetchWithAuth(`${BASE_URL}/articles`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
       },
       body: JSON.stringify({ title, content, image }),
     });
@@ -26,14 +33,16 @@ export const postArticle = async (formData: FormDataProps) => {
     if (!response.ok) {
       const errorData = await response.json();
       console.log('보드 등록 실패', errorData);
+      return { success: false, error: errorData };
     }
 
     const data = await response.json();
-    const articleId = await data.id;
+    const articleId = data.id;
 
     return { success: true, boardId: articleId };
   } catch (error) {
     console.log('보드 등록 중 오류', error);
+    // 오류 종류에 따른 구체적인 메시지 제공
     return { success: false, error: error };
   }
 };
